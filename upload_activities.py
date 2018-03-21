@@ -2,7 +2,6 @@ import os
 import psycopg2
 
 import pandas as pd
-import numpy as np
 
 os.chdir(r'C:\users\barby\downloads')
 
@@ -30,6 +29,7 @@ def uploadDF(dat, table):
     q = 'INSERT INTO ' + table + ' (' + ",".join(up.columns) + ") VALUES ('"
     q = q + "'),('".join(up.astype(str).apply("','".join, axis=1))
     q = q + "')"
+    q = q.replace("'NULL'", "NULL")
     pw = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)[0].item().split('=')[1]
     conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
     conn = psycopg2.connect(conn_string)
@@ -51,6 +51,12 @@ dbSendQuery("DELETE FROM runs.activities WHERE date >= '" + str(min(up.date)) + 
 
 #%%
 
+for col in ['calories', 'elev_gain', 'elev_loss']:
+    up[col] = [c.replace(',', '') for c in up[col]]
+
+for col in ['title']:
+    up[col] = [c.replace("'", "") for c in up[col]]
+    
 for i in range(len(up)):
     for col in ['duration_seconds', 'avg_pace', 'best_pace']:
         if len(up.loc[i, col].split(':')) == 2:
@@ -58,10 +64,10 @@ for i in range(len(up)):
         elif len(up.loc[i, col].split(':')) == 3:
             up.loc[i, col] = (60*60*float(up.loc[i, col].split(':')[0])) + (60*float(up.loc[i, col].split(':')[1])) + float(up.loc[i, col].split(':')[0])
 
-up = up.replace('--', np.nan)
+up = up.replace('--', 'NULL')
 
 #%%
 uploadDF(up, 'runs.activities')
 
 #%%
-os.remove('transactions.csv')
+os.remove('activities.csv')
