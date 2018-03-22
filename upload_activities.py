@@ -1,13 +1,31 @@
 import os
 import psycopg2
 
+import requests
+
 import pandas as pd
 
 os.chdir(r'C:\users\barby\downloads')
 
+base_url = r'https://www.strava.com/api/v3/'
+
 #%%
+def readConfig(key):
+    config = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)
+    config = [c.split('=') for c in config[0]]
+    out = [c[1] for c in config if c[0] == key][0]
+    return(out)
+
+def getActivityList(pg = 1):
+    url = base_url + r'athlete/activities'
+    url = url + r'?access_token=' + readConfig('stravatoken')
+    url = url + r'&page=' + str(pg)
+    dat = requests.get(url).json()
+    
+    return(dat)
+    
 def dbGetQuery(q):
-    pw = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)[0].item().split('=')[1]
+    pw = readConfig('pw') 
     conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
     conn = psycopg2.connect(conn_string)
     conn.autocommit = True
@@ -16,7 +34,7 @@ def dbGetQuery(q):
     return(dat)
     
 def dbSendQuery(q):
-    pw = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)[0].item().split('=')[1]
+    pw = readConfig('pw') 
     conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
     conn = psycopg2.connect(conn_string)
     conn.autocommit = True
@@ -26,11 +44,11 @@ def dbSendQuery(q):
     conn.close()
     
 def uploadDF(dat, table):
-    q = 'INSERT INTO ' + table + ' (' + ",".join(up.columns) + ") VALUES ('"
-    q = q + "'),('".join(up.astype(str).apply("','".join, axis=1))
+    q = 'INSERT INTO ' + table + ' (' + ",".join(dat.columns) + ") VALUES ('"
+    q = q + "'),('".join(dat.astype(str).apply("','".join, axis=1))
     q = q + "')"
     q = q.replace("'NULL'", "NULL")
-    pw = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)[0].item().split('=')[1]
+    pw = readConfig('pw')
     conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
     conn = psycopg2.connect(conn_string)
     conn.autocommit = True
@@ -39,35 +57,97 @@ def uploadDF(dat, table):
     cursor.close()
     conn.close()
     
-#%%
-  
-up = pd.read_csv('activities.csv')
-up.columns = [c.lower().replace(' ', '_') for c in up.columns]
-up = up[['date', 'activity_type', 'title', 'distance', 'calories', 'time', 'avg_hr', 'max_hr', 'avg_cadence', 'max_cadence',
-         'avg_pace', 'best_pace', 'elev_gain', 'elev_loss', 'avg_stride_length']]
-up.columns = ['date', 'activity_type', 'title', 'distance', 'calories', 'duration_seconds', 'avg_hr', 'max_hr', 'avg_cadence', 'max_cadence',
-         'avg_pace', 'best_pace', 'elev_gain', 'elev_loss', 'avg_stride_length']
-dbSendQuery("DELETE FROM runs.activities WHERE date >= '" + str(min(up.date)) + "' AND date <= '" + str(max(up.date)) + "'")
-
-#%%
-
-for col in ['calories', 'elev_gain', 'elev_loss']:
-    up[col] = [c.replace(',', '') for c in up[col]]
-
-for col in ['title']:
-    up[col] = [c.replace("'", "") for c in up[col]]
+#%% Query Strava API
+p = 1
+cols = ['average_speed', 'average_cadence', 'distance', 'elapsed_time', 'elev_high', 'elev_low', 'end_lat', 'end_long',
+                              'strava_id', 'kudos_count', 'location_city', 'location_country', 'location_state', 'manual',
+                              'max_speed', 'moving_time', 'name', 'achievement_count', 'pr_count', 'start_date', 'start_date_local',
+                              'start_lat', 'start_long', 'timezone', 'total_elevation_gain', 'type']
+out = pd.DataFrame(columns = cols)
+dat = getActivityList(1)
+while len(dat) > 0:
     
-for i in range(len(up)):
-    for col in ['duration_seconds', 'avg_pace', 'best_pace']:
-        if len(up.loc[i, col].split(':')) == 2:
-            up.loc[i, col] = (60*float(up.loc[i, col].split(':')[0])) + float(up.loc[i, col].split(':')[1])
-        elif len(up.loc[i, col].split(':')) == 3:
-            up.loc[i, col] = (60*60*float(up.loc[i, col].split(':')[0])) + (60*float(up.loc[i, col].split(':')[1])) + float(up.loc[i, col].split(':')[0])
-
-up = up.replace('--', 'NULL')
+    for entry in dat:
+        if entry['start_latlng'] is None:
+            start_lat = 'NULL'
+            start_long = 'NULL'
+        else:
+            start_lat = entry['start_latlng'][0]
+            start_long = entry['start_latlng'][1]
+        
+        if entry['end_latlng'] is None:
+            end_lat = 'NULL'
+            end_long = 'NULL'
+        else:
+            end_lat = entry['end_latlng'][0]
+            end_long = entry['end_latlng'][1]
+            
+        if 'elev_high' in entry.keys():
+            elev_high = entry['elev_high']
+            elev_low = entry['elev_low']
+        else:
+            elev_high = 0
+            elev_low = 0
+            
+        if entry['manual']:
+            manual = 1
+        else:
+            manual = 0
+            
+        if 'average_cadence' in entry.keys():
+            average_cadence = entry['average_cadence']
+        else:
+            average_cadence = 'NULL'
+            
+        if entry['location_city'] is None:
+            location_city = 'NULL'
+        else:
+            location_city = entry['location_city']
+        
+        if entry['location_country'] is None:
+            location_country = 'NULL'
+        else:
+            location_country = entry['location_country']
+            
+        if entry['location_state'] is None:
+            location_state = 'NULL'
+        else:
+            location_state = entry['location_state']
+            
+        tmp = pd.DataFrame([[
+                entry['average_speed'],
+                average_cadence,
+                entry['distance'],
+                entry['elapsed_time'],
+                elev_high,
+                elev_low,
+                end_lat,
+                end_long,
+                entry['id'],
+                entry['kudos_count'],
+                location_city,
+                location_country,
+                location_state,
+                manual,
+                entry['max_speed'],
+                entry['moving_time'],
+                entry['name'],
+                entry['achievement_count'],
+                entry['pr_count'],
+                entry['start_date'],
+                entry['start_date_local'],
+                start_lat,
+                start_long,
+                entry['timezone'],
+                entry['total_elevation_gain'],
+                entry['type'],
+                ]], columns = cols)
+        out = out.append(tmp)
+    
+    p += 1
+    dat = getActivityList(p)
 
 #%%
-uploadDF(up, 'runs.activities')
-
-#%%
-os.remove('activities.csv')
+dbSendQuery("DELETE FROM runs.activities WHERE start_date >= '" + min(out.start_date) + "' AND start_date <= '" + max(out.start_date) + "'")
+out.name = [c.replace("'", "") for c in out.name]
+uploadDF(out, 'runs.activities')    
