@@ -1,13 +1,21 @@
 import os
+import sys
 import psycopg2
 
 import requests
+
+import datetime
 
 import pandas as pd
 
 os.chdir(r'C:\users\barby\downloads')
 
 base_url = r'https://www.strava.com/api/v3/'
+
+if len(sys.argv) > 1:
+    after = sys.argv[1]
+else:
+    after = '1970-01-02'
 
 #%%
 def readConfig(key):
@@ -16,11 +24,15 @@ def readConfig(key):
     out = [c[1] for c in config if c[0] == key][0]
     return(out)
 
-def getActivityList(pg = 1):
+def getActivityList(pg = 1, before = str(datetime.datetime.now().date()), after = str(datetime.date(1970,1,2))):
+    print('Fetching activities from ' + after + ' to ' + before + ' (page ' + str(pg) + ')')
     url = base_url + r'athlete/activities'
     url = url + r'?access_token=' + readConfig('stravatoken')
+    url = url + r'&before=' + str(datetime.datetime.strptime(before, '%Y-%m-%d').timestamp())
+    url = url + r'&after=' + str(datetime.datetime.strptime(after, '%Y-%m-%d').timestamp())
     url = url + r'&page=' + str(pg)
     dat = requests.get(url).json()
+    print('Found ' + str(len(dat)) + ' activities')
     
     return(dat)
     
@@ -64,7 +76,8 @@ cols = ['average_speed', 'average_cadence', 'distance', 'elapsed_time', 'elev_hi
                               'max_speed', 'moving_time', 'name', 'achievement_count', 'pr_count', 'start_date', 'start_date_local',
                               'start_lat', 'start_long', 'timezone', 'total_elevation_gain', 'type']
 out = pd.DataFrame(columns = cols)
-dat = getActivityList(1)
+
+dat = getActivityList(1, after = after)
 while len(dat) > 0:
     
     for entry in dat:
@@ -145,7 +158,7 @@ while len(dat) > 0:
         out = out.append(tmp)
     
     p += 1
-    dat = getActivityList(p)
+    dat = getActivityList(p, after = after)
 
 #%%
 dbSendQuery("DELETE FROM runs.activities WHERE start_date >= '" + min(out.start_date) + "' AND start_date <= '" + max(out.start_date) + "'")
