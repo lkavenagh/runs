@@ -15,7 +15,7 @@ base_url = r'https://www.strava.com/api/v3/'
 if len(sys.argv) > 1:
     after = sys.argv[1]
 else:
-    after = '1970-01-02'
+    after = str(datetime.datetime.today().date() - datetime.timedelta(7))
 
 #%%
 def readConfig(key):
@@ -24,7 +24,7 @@ def readConfig(key):
     out = [c[1] for c in config if c[0] == key][0]
     return(out)
 
-def getActivityList(pg = 1, before = str(datetime.datetime.now().date()), after = str(datetime.date(1970,1,2))):
+def getActivityList(pg = 1, before = str(datetime.datetime.now().date() + datetime.timedelta(1)), after = str(datetime.date(1970,1,2))):
     print('Fetching activities from ' + after + ' to ' + before + ' (page ' + str(pg) + ')')
     url = base_url + r'athlete/activities'
     url = url + r'?access_token=' + readConfig('stravatoken')
