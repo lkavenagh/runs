@@ -12,11 +12,6 @@ os.chdir(r'C:\users\barby\downloads')
 
 base_url = r'https://www.strava.com/api/v3/'
 
-if len(sys.argv) > 1:
-    after = sys.argv[1]
-else:
-    after = str(datetime.datetime.today().date() - datetime.timedelta(7))
-
 #%%
 def readConfig(key):
     config = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)
@@ -68,6 +63,13 @@ def uploadDF(dat, table):
     cursor.execute(q)
     cursor.close()
     conn.close()
+
+#%%
+    
+if len(sys.argv) > 1:
+    after = sys.argv[1]
+else:
+    after = str(dbGetQuery("SELECT max(start_date) as maxdate FROM runs.activities").maxdate[0].date() - datetime.timedelta(7))
     
 #%% Query Strava API
 p = 1
