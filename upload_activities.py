@@ -8,13 +8,19 @@ import datetime
 
 import pandas as pd
 
-os.chdir(r'C:\users\barby\downloads')
+if os.environ['DESKTOP_SESSION'] == 'ubuntu':
+    os.chdir(r'/home/lkavenagh/Documents/Github/runs')
+else:
+    os.chdir(r'C:\users\barby\documents\github\runs')
 
 base_url = r'https://www.strava.com/api/v3/'
 
 #%%
 def readConfig(key):
-    config = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)
+    if os.environ['DESKTOP_SESSION'] == 'ubuntu':
+        config = pd.read_table(r'/home/lkavenagh/Documents/config.txt', header = None)
+    else:
+        config = pd.read_table(r'c:\users\barby\documents\config.txt', header = None)
     config = [c.split('=') for c in config[0]]
     out = [c[1] for c in config if c[0] == key][0]
     return(out)
