@@ -14,24 +14,24 @@ base_url = r'https://www.strava.com/api/v3/'
 
 #%%
 def readConfig(key):
-    config = pd.read_csv(r'C:\users\lkave\documents\config.txt', header = None)
+    config = pd.read_csv(r'C:\users\lkave\documents\github\config.txt', header = None)
     config = [c.split('=') for c in config[0]]
     out = [c[1] for c in config if c[0] == key][0]
     return(out)
 
 def addLineToConfig(key, val):
-    with open(r'C:\users\lkave\documents\config.txt', 'a') as myfile:
+    with open(r'C:\users\lkave\documents\github\config.txt', 'a') as myfile:
         myfile.write('{}={}\n'.format(key, val))
         
 def removeLineFromConfig(key):
-    with open(r'C:\users\lkave\documents\config.txt', 'r') as myfile:
+    with open(r'C:\users\lkave\documents\github\config.txt', 'r') as myfile:
         lines = myfile.readlines()
     
     contents = dict()
     for line in lines:
         contents[line.split('=')[0]] = line.split('=')[1]
         
-    with open(r'C:\users\lkave\documents\config.txt', 'w') as myfile:
+    with open(r'C:\users\lkave\documents\github\config.txt', 'w') as myfile:
         for key_to_write, val_to_write in contents.items():
             if key_to_write != key:
                 myfile.write('{}={}'.format(key_to_write, val_to_write))
