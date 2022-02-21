@@ -7,6 +7,16 @@ import requests
 import datetime
 
 import pandas as pd
+import numpy as np
+
+from google.cloud import bigquery
+import pandas_gbq
+from google.oauth2 import service_account
+
+credentials = service_account.Credentials.from_service_account_file('running-342013-76741001e21e.json')
+
+project_id = 'running-342013'
+client = bigquery.Client(credentials = credentials, project = project_id)
 
 os.chdir(r'C:\users\lkave\documents\github\runs')
 
@@ -48,37 +58,15 @@ def getActivityList(pg = 1, before = str(datetime.datetime.now().date() + dateti
     return(dat)
     
 def dbGetQuery(q):
-    pw = readConfig('pw') 
-    conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
-    conn = psycopg2.connect(conn_string)
-    conn.autocommit = True
-    dat = pd.read_sql(q, conn)
-    conn.close()
+    dat = client.query(q).result().to_dataframe()
+
     return(dat)
     
 def dbSendQuery(q):
-    pw = readConfig('pw') 
-    conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
-    conn = psycopg2.connect(conn_string)
-    conn.autocommit = True
-    cursor = conn.cursor()
-    cursor.execute(q)
-    cursor.close()
-    conn.close()
+    client.query(q).result().to_dataframe()
     
 def uploadDF(dat, table):
-    q = 'INSERT INTO ' + table + ' (' + ",".join(dat.columns) + ") VALUES ('"
-    q = q + "'),('".join(dat.astype(str).apply("','".join, axis=1))
-    q = q + "')"
-    q = q.replace("'NULL'", "NULL")
-    pw = readConfig('pw')
-    conn_string = "host='kavdb.c9lrodma91yx.us-west-2.rds.amazonaws.com' dbname='kavdb' user='lkavenagh' password='" + pw + "'"
-    conn = psycopg2.connect(conn_string)
-    conn.autocommit = True
-    cursor = conn.cursor()
-    cursor.execute(q)
-    cursor.close()
-    conn.close()
+    dat.to_gbq(table, project_id = project_id, if_exists = 'append')
 
 #%% Refresh API token
 url = 'https://www.strava.com/oauth/token'
@@ -199,4 +187,23 @@ while len(dat) > 0:
 #%%
 dbSendQuery("DELETE FROM runs.activities WHERE start_date >= '" + min(out.start_date) + "' AND start_date <= '" + max(out.start_date) + "'")
 out.name = [c.replace("'", "") for c in out.name]
+
+out = out.reset_index(drop = True)
+out = out[['strava_id', 'name', 'start_date', 'start_date_local', 'timezone', 'start_lat', 'start_long', 'type', 'location_city', 'location_state', 'location_country',
+          'average_speed', 'average_cadence', 'distance', 'elapsed_time', 'elev_high', 'elev_low', 'total_elevation_gain', 'end_lat', 'end_long',
+          'moving_time', 'max_speed', 'kudos_count', 'achievement_count', 'pr_count', 'manual']]
+
+out['start_date'] = [datetime.datetime.strptime(c, '%Y-%m-%dT%H:%M:%SZ') for c in out.start_date]
+out['start_date_local'] = [datetime.datetime.strptime(c, '%Y-%m-%dT%H:%M:%SZ') for c in out.start_date_local]
+
+out.start_date = pd.to_datetime(out.start_date)
+out.start_date_local = pd.to_datetime(out.start_date_local)
+out.strava_id = out.strava_id.astype(str)
+out.manual = out.manual.astype(str)
+out.elapsed_time = out.elapsed_time.astype(np.int64)
+out.moving_time = out.moving_time.astype(np.int64)
+out.kudos_count = out.kudos_count.astype(np.int64)
+out.achievement_count = out.achievement_count.astype(np.int64)
+out.pr_count = out.pr_count.astype(np.int64)
+
 uploadDF(out, 'runs.activities')    
