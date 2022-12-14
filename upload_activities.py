@@ -105,16 +105,16 @@ dat = getActivityList(1, after = after)
 while len(dat) > 0:
     
     for entry in dat:
-        if entry['start_latlng'] is None:
-            start_lat = 'NULL'
-            start_long = 'NULL'
+        if (entry['start_latlng'] is None) or (len(entry['start_latlng']) == 0):
+            start_lat = np.nan
+            start_long = np.nan
         else:
             start_lat = entry['start_latlng'][0]
             start_long = entry['start_latlng'][1]
         
-        if entry['end_latlng'] is None:
-            end_lat = 'NULL'
-            end_long = 'NULL'
+        if (entry['end_latlng'] is None) or (len(entry['end_latlng']) == 0):
+            end_lat = np.nan
+            end_long = np.nan
         else:
             end_lat = entry['end_latlng'][0]
             end_long = entry['end_latlng'][1]
@@ -134,7 +134,7 @@ while len(dat) > 0:
         if 'average_cadence' in entry.keys():
             average_cadence = entry['average_cadence']
         else:
-            average_cadence = 'NULL'
+            average_cadence = np.nan
             
         if entry['location_city'] is None:
             location_city = 'NULL'
